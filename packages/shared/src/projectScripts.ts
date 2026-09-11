@@ -55,3 +55,15 @@ export function projectScriptRuntimeEnv(
 export function setupProjectScript(scripts: readonly ProjectScript[]): ProjectScript | null {
   return scripts.find((script) => script.runOnWorktreeCreate) ?? null;
 }
+
+/**
+ * Terminal dedicated to an action, mirroring the server's `setup-<id>` convention for
+ * setup scripts. Deriving the id from the action (instead of tracking the launch
+ * client-side) is what lets every client — including a phone attached to the same
+ * thread — tell that an action is still running.
+ *
+ * Safe against the allocator: `nextTerminalId` only ever hands out `term-N`.
+ */
+export function projectScriptTerminalId(scriptId: string): string {
+  return `script-${scriptId}`;
+}

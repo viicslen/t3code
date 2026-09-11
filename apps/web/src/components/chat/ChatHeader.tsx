@@ -58,6 +58,8 @@ interface ChatHeaderProps {
   activeProject: EnvironmentProject | null;
   openInCwd: string | null;
   activeProjectScripts: ReadonlyArray<ProjectScript> | undefined;
+  /** Actions whose pinned terminal is busy; clicking one again stops it. */
+  runningProjectScriptIds: ReadonlySet<string>;
   preferredScriptId: string | null;
   keybindings: ResolvedKeybindingsConfig;
   availableEditors: ReadonlyArray<EditorId>;
@@ -67,6 +69,7 @@ interface ChatHeaderProps {
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
   onRunProjectScript: (script: ProjectScript) => void;
+  onStopProjectScript: (script: ProjectScript) => void;
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
   onUpdateProjectScript: (
     scriptId: string,
@@ -127,6 +130,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeProject,
   openInCwd,
   activeProjectScripts,
+  runningProjectScriptIds,
   preferredScriptId,
   keybindings,
   availableEditors,
@@ -136,6 +140,7 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
   onRunProjectScript,
+  onStopProjectScript,
   onAddProjectScript,
   onUpdateProjectScript,
   onDeleteProjectScript,
@@ -415,7 +420,9 @@ export const ChatHeader = memo(function ChatHeader({
             fileScripts={fileScripts}
             keybindings={keybindings}
             preferredScriptId={preferredScriptId}
+            runningScriptIds={runningProjectScriptIds}
             onRunScript={onRunProjectScript}
+            onStopScript={onStopProjectScript}
             onAddScript={onAddProjectScript}
             onUpdateScript={onUpdateProjectScript}
             onDeleteScript={onDeleteProjectScript}

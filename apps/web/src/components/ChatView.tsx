@@ -66,6 +66,7 @@ import {
 import {
   projectScriptCwd,
   projectScriptRuntimeEnv,
+  projectScriptTerminalId,
   resolveProjectScripts,
 } from "@t3tools/shared/projectScripts";
 import { truncate } from "@t3tools/shared/String";
@@ -153,7 +154,6 @@ import {
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
-  DEFAULT_THREAD_TERMINAL_ID,
   MAX_TERMINALS_PER_GROUP,
   type ChatMessage,
   isBrowserPreviewAttachment,
@@ -228,6 +228,10 @@ import {
 import { cn, randomHex } from "~/lib/utils";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { decodeProjectScriptKeybindingRule } from "~/lib/projectScriptKeybindings";
+import {
+  clearConfirmedPendingScriptIds,
+  selectRunningProjectScriptIds,
+} from "~/projectScriptRunState";
 import { type NewProjectScriptInput } from "./ProjectScriptsControl";
 import {
   buildProjectScript,
@@ -673,6 +677,15 @@ function formatOutgoingPrompt(params: {
 }
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
+const EMPTY_SCRIPT_IDS: ReadonlySet<string> = new Set();
+/** Ctrl-C, delivered to the action terminal's foreground process group. */
+const TERMINAL_INTERRUPT_SEQUENCE = "\u0003";
+/**
+ * How long a launched action may claim to be running before the server's
+ * subprocess poll has to back it up. Without this, an action that exits
+ * immediately would never clear and the button would lie.
+ */
+const SCRIPT_PENDING_GRACE_MS = 3_000;
 
 function isCompactCommandMessage(message: ChatMessage): boolean {
   const text = message.text.trim().toLowerCase();
@@ -1849,6 +1862,21 @@ export default function ChatView(props: ChatViewProps) {
     environmentId: activeThread?.environmentId ?? null,
     threadId: activeThreadId,
   });
+  // Actions launched but not yet visible to the server's subprocess poll.
+  const [pendingScriptIds, setPendingScriptIds] = useState<ReadonlySet<string>>(EMPTY_SCRIPT_IDS);
+  const clearPendingScriptId = useCallback((scriptId: string) => {
+    setPendingScriptIds((current) => {
+      if (!current.has(scriptId)) return current;
+      const next = new Set(current);
+      next.delete(scriptId);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    setPendingScriptIds(
+      (current) => clearConfirmedPendingScriptIds(current, runningTerminalIds) ?? current,
+    );
+  }, [runningTerminalIds]);
   const activeThreadKnownSessionsRaw = useKnownTerminalSessions({
     environmentId: activeThread?.environmentId ?? null,
     threadId: activeThreadId,
@@ -2036,6 +2064,15 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectScripts = useMemo(
     () => (activeProject ? resolveProjectScripts(settings, activeProject) : []),
     [activeProject, settings],
+  );
+  const runningProjectScriptIds = useMemo(
+    () =>
+      selectRunningProjectScriptIds({
+        scripts: activeProjectScripts,
+        runningTerminalIds,
+        pendingScriptIds,
+      }),
+    [activeProjectScripts, pendingScriptIds, runningTerminalIds],
   );
   const activeProjectDefaultModelSelection =
     activeProject?.defaultModelSelection ?? settings.defaultModelSelection;
@@ -3832,7 +3869,6 @@ export default function ChatView(props: ChatViewProps) {
         cwd?: string;
         env?: Record<string, string>;
         worktreePath?: string | null;
-        preferNewTerminal?: boolean;
         rememberAsLastInvoked?: boolean;
       },
     ) => {
@@ -3844,12 +3880,16 @@ export default function ChatView(props: ChatViewProps) {
         });
       }
       const targetCwd = options?.cwd ?? gitCwd ?? activeProject.workspaceRoot;
-      const baseTerminalId =
-        terminalUiState.activeTerminalId || activeKnownTerminalIds[0] || DEFAULT_THREAD_TERMINAL_ID;
-      const isBaseTerminalBusy = runningTerminalIds.includes(baseTerminalId);
-      const wantsNewTerminal = Boolean(options?.preferNewTerminal) || isBaseTerminalBusy;
-      const shouldCreateNewTerminal = wantsNewTerminal;
+      // Each action owns one terminal so every client can see it running and stop it.
+      const targetTerminalId = projectScriptTerminalId(script.id);
+      const shouldCreateNewTerminal = !terminalUiState.terminalIds.includes(targetTerminalId);
       const targetWorktreePath = options?.worktreePath ?? activeThread.worktreePath ?? null;
+      setPendingScriptIds((current) => {
+        if (current.has(script.id)) return current;
+        return new Set(current).add(script.id);
+      });
+      // Fires harmlessly when the poll already confirmed the run.
+      setTimeout(() => clearPendingScriptId(script.id), SCRIPT_PENDING_GRACE_MS);
 
       setTerminalUiLaunchContext({
         threadId: activeThreadId,
@@ -3869,9 +3909,6 @@ export default function ChatView(props: ChatViewProps) {
         worktreePath: targetWorktreePath,
         ...(options?.env ? { extraEnv: options.env } : {}),
       });
-      const targetTerminalId = shouldCreateNewTerminal
-        ? nextTerminalId(allocatableActiveTerminalIds)
-        : baseTerminalId;
       const openTerminalInput: TerminalOpenInput = shouldCreateNewTerminal
         ? {
             threadId: activeThreadId,
@@ -3890,14 +3927,11 @@ export default function ChatView(props: ChatViewProps) {
             env: runtimeEnv,
           };
 
-      if (shouldCreateNewTerminal) {
-        storeNewTerminal(activeThreadRef, targetTerminalId);
-      } else {
-        storeSetActiveTerminal(activeThreadRef, targetTerminalId);
-      }
+      storeEnsureTerminal(activeThreadRef, targetTerminalId);
 
       const openResult = await openTerminal({ environmentId, input: openTerminalInput });
       if (openResult._tag === "Failure") {
+        clearPendingScriptId(script.id);
         if (!isAtomCommandInterrupted(openResult)) {
           const error = squashAtomCommandFailure(openResult);
           setThreadError(
@@ -3916,12 +3950,15 @@ export default function ChatView(props: ChatViewProps) {
           data: `${script.command}\r`,
         },
       });
-      if (writeResult._tag === "Failure" && !isAtomCommandInterrupted(writeResult)) {
-        const error = squashAtomCommandFailure(writeResult);
-        setThreadError(
-          activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
-        );
+      if (writeResult._tag === "Failure") {
+        clearPendingScriptId(script.id);
+        if (!isAtomCommandInterrupted(writeResult)) {
+          const error = squashAtomCommandFailure(writeResult);
+          setThreadError(
+            activeThreadId,
+            error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          );
+        }
       }
     },
     [
@@ -3929,20 +3966,45 @@ export default function ChatView(props: ChatViewProps) {
       activeThread,
       activeThreadId,
       activeThreadRef,
+      clearPendingScriptId,
       gitCwd,
       setTerminalOpen,
       setThreadError,
-      storeNewTerminal,
-      storeSetActiveTerminal,
+      storeEnsureTerminal,
       setLastInvokedScriptByProjectId,
       environmentId,
       openTerminal,
-      activeKnownTerminalIds,
-      allocatableActiveTerminalIds,
-      runningTerminalIds,
-      terminalUiState.activeTerminalId,
+      terminalUiState.terminalIds,
       writeTerminal,
     ],
+  );
+
+  /**
+   * Ctrl-C rather than a signal: it reaches the foreground process group the way
+   * typing it would, leaving the action's terminal alive for a re-run. A process
+   * that traps SIGINT survives, and the indicator honestly stays lit.
+   */
+  const stopProjectScript = useCallback(
+    async (script: ProjectScript) => {
+      if (!activeThreadId) return;
+      clearPendingScriptId(script.id);
+      const result = await writeTerminal({
+        environmentId,
+        input: {
+          threadId: activeThreadId,
+          terminalId: projectScriptTerminalId(script.id),
+          data: TERMINAL_INTERRUPT_SEQUENCE,
+        },
+      });
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        setThreadError(
+          activeThreadId,
+          error instanceof Error ? error.message : `Failed to stop "${script.name}".`,
+        );
+      }
+    },
+    [activeThreadId, clearPendingScriptId, environmentId, setThreadError, writeTerminal],
   );
 
   const persistProjectScripts = useCallback(
@@ -8441,7 +8503,9 @@ export default function ChatView(props: ChatViewProps) {
             {...(activeDraftLogicalProjectKey
               ? { onOpenProjectSettings: handleOpenDraftProjectSettings }
               : {})}
+            runningProjectScriptIds={runningProjectScriptIds}
             onRunProjectScript={runProjectScript}
+            onStopProjectScript={stopProjectScript}
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}

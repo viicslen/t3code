@@ -7,7 +7,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { ChevronDownIcon, DownloadIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import { ChevronDownIcon, DownloadIcon, PlusIcon, SettingsIcon, SquareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { commandForProjectScript, primaryProjectScript } from "~/projectScripts";
@@ -39,13 +39,24 @@ export type { NewProjectScriptInput, ProjectScriptActionResult };
 
 const NO_FILE_SCRIPTS: ReadonlyArray<T3ProjectFileScript> = [];
 
+/**
+ * Steady, not pulsing: a dev server stays up for hours, and an animation that
+ * repaints for that long is exactly the kind that pegs a high-refresh display.
+ */
+function RunningDot() {
+  return <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-info" />;
+}
+
 interface ProjectScriptsControlProps {
   scripts: ReadonlyArray<ProjectScript>;
   /** Scripts declared in the project's checked-in t3.json, offered for import. */
   fileScripts?: ReadonlyArray<T3ProjectFileScript>;
   keybindings: ResolvedKeybindingsConfig;
   preferredScriptId?: string | null;
+  /** Actions currently occupying their terminal; these toggle to stop. */
+  runningScriptIds: ReadonlySet<string>;
   onRunScript: (script: ProjectScript) => void;
+  onStopScript: (script: ProjectScript) => void;
   onAddScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
   onUpdateScript: (
     scriptId: string,
@@ -59,7 +70,9 @@ export default function ProjectScriptsControl({
   fileScripts = NO_FILE_SCRIPTS,
   keybindings,
   preferredScriptId = null,
+  runningScriptIds,
   onRunScript,
+  onStopScript,
   onAddScript,
   onUpdateScript,
   onDeleteScript,
@@ -77,6 +90,17 @@ export default function ProjectScriptsControl({
     }
     return primaryProjectScript(scripts);
   }, [preferredScriptId, scripts]);
+  const primaryScriptRunning = primaryScript !== null && runningScriptIds.has(primaryScript.id);
+  const toggleScript = useCallback(
+    (script: ProjectScript) => {
+      if (runningScriptIds.has(script.id)) {
+        onStopScript(script);
+        return;
+      }
+      onRunScript(script);
+    },
+    [onRunScript, onStopScript, runningScriptIds],
+  );
   const importableScripts = useMemo(
     () =>
       fileScripts.filter(
@@ -163,20 +187,26 @@ export default function ProjectScriptsControl({
                   size="xs"
                   variant="outline"
                   className="w-7 px-0 sm:w-6 @3xl/header-actions:w-auto! @3xl/header-actions:px-[calc(--spacing(2)-1px)]"
-                  aria-label={`Run ${primaryScript.name}`}
+                  aria-label={`${primaryScriptRunning ? "Stop" : "Run"} ${primaryScript.name}`}
                   // The tooltip wrapper replaces data-slot="button", so themed
                   // toolbar styling needs its own hook.
                   data-toolbar-control=""
-                  onClick={() => onRunScript(primaryScript)}
+                  onClick={() => toggleScript(primaryScript)}
                 />
               }
             >
-              <ScriptIcon icon={primaryScript.icon} />
+              {primaryScriptRunning ? (
+                <SquareIcon className="size-3.5 fill-current" />
+              ) : (
+                <ScriptIcon icon={primaryScript.icon} />
+              )}
               <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
                 {primaryScript.name}
               </span>
             </TooltipTrigger>
-            <TooltipPopup side="top">Run {primaryScript.name}</TooltipPopup>
+            <TooltipPopup side="top">
+              {primaryScriptRunning ? "Stop" : "Run"} {primaryScript.name}
+            </TooltipPopup>
           </Tooltip>
           <GroupSeparator className="hidden @3xl/header-actions:block" />
           <Menu
@@ -195,16 +225,19 @@ export default function ProjectScriptsControl({
                   keybindings,
                   commandForProjectScript(script.id),
                 );
+                const running = runningScriptIds.has(script.id);
                 return (
                   <MenuItem
                     key={script.id}
                     className={`group ${dropdownItemClassName}`}
-                    onClick={() => onRunScript(script)}
+                    aria-label={running ? `Stop ${script.name}` : undefined}
+                    onClick={() => toggleScript(script)}
                   >
                     <ScriptIcon icon={script.icon} className="size-4" />
                     <span className="truncate">
                       {script.runOnWorktreeCreate ? `${script.name} (setup)` : script.name}
                     </span>
+                    {running && <RunningDot />}
                     <span className="relative ms-auto flex h-6 min-w-6 items-center justify-end">
                       {shortcutLabel && (
                         <MenuShortcut className="ms-0 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
