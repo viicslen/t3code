@@ -83,6 +83,8 @@ export interface NewProjectScriptInput {
   previewUrl: string | null;
   /** When true, automatically open the preview panel pointed at `previewUrl`. */
   autoOpenPreview: boolean;
+  /** When true, every run opens its own terminal and the action cannot be stopped. */
+  allowMultipleInstances: boolean;
 }
 
 export type ProjectScriptActionResult = AtomCommandResult<void, unknown>;
@@ -95,6 +97,7 @@ export const EMPTY_PROJECT_SCRIPT_INPUT: NewProjectScriptInput = {
   keybinding: null,
   previewUrl: null,
   autoOpenPreview: false,
+  allowMultipleInstances: false,
 };
 
 /** What the editor dialog should open with. `scriptId: null` means "add". */
@@ -119,6 +122,7 @@ export function editorRequestForScript(
       keybinding: keybindingValueForCommand(keybindings, commandForProjectScript(script.id)),
       previewUrl: script.previewUrl ?? null,
       autoOpenPreview: script.autoOpenPreview ?? false,
+      allowMultipleInstances: script.allowMultipleInstances ?? false,
     },
   };
 }
@@ -151,6 +155,7 @@ export function ProjectScriptEditorDialog({
   const [icon, setIcon] = useState<ProjectScriptIcon>("play");
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [runOnWorktreeCreate, setRunOnWorktreeCreate] = useState(false);
+  const [allowMultipleInstances, setAllowMultipleInstances] = useState(false);
   const [keybinding, setKeybinding] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [autoOpenPreview, setAutoOpenPreview] = useState(false);
@@ -168,6 +173,7 @@ export function ProjectScriptEditorDialog({
     setIcon(request.initial.icon);
     setIconPickerOpen(false);
     setRunOnWorktreeCreate(request.initial.runOnWorktreeCreate);
+    setAllowMultipleInstances(request.initial.allowMultipleInstances);
     setKeybinding(request.initial.keybinding ?? "");
     setPreviewUrl(request.initial.previewUrl ?? "");
     setAutoOpenPreview(request.initial.autoOpenPreview);
@@ -219,6 +225,7 @@ export function ProjectScriptEditorDialog({
         command: trimmedCommand,
         icon,
         runOnWorktreeCreate,
+        allowMultipleInstances,
         keybinding: keybindingRule?.key ?? null,
         previewUrl: trimmedPreviewUrl.length > 0 ? trimmedPreviewUrl : null,
         autoOpenPreview: trimmedPreviewUrl.length > 0 ? autoOpenPreview : false,
@@ -350,6 +357,19 @@ export function ProjectScriptEditorDialog({
                 <Switch
                   checked={runOnWorktreeCreate}
                   onCheckedChange={(checked) => setRunOnWorktreeCreate(Boolean(checked))}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
+                <span className="min-w-0">
+                  Allow multiple instances
+                  <span className="block text-xs text-muted-foreground">
+                    Each run opens its own terminal. T3 Code no longer shows this action as running,
+                    and cannot stop it.
+                  </span>
+                </span>
+                <Switch
+                  checked={allowMultipleInstances}
+                  onCheckedChange={(checked) => setAllowMultipleInstances(Boolean(checked))}
                 />
               </label>
               <label

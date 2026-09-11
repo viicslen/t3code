@@ -3880,16 +3880,21 @@ export default function ChatView(props: ChatViewProps) {
         });
       }
       const targetCwd = options?.cwd ?? gitCwd ?? activeProject.workspaceRoot;
-      // Each action owns one terminal so every client can see it running and stop it.
-      const targetTerminalId = projectScriptTerminalId(script.id);
+      // Each action owns one terminal so every client can see it running and stop it,
+      // unless it opted into running several at once.
+      const targetTerminalId = script.allowMultipleInstances
+        ? nextTerminalId(allocatableActiveTerminalIds)
+        : projectScriptTerminalId(script.id);
       const shouldCreateNewTerminal = !terminalUiState.terminalIds.includes(targetTerminalId);
       const targetWorktreePath = options?.worktreePath ?? activeThread.worktreePath ?? null;
-      setPendingScriptIds((current) => {
-        if (current.has(script.id)) return current;
-        return new Set(current).add(script.id);
-      });
-      // Fires harmlessly when the poll already confirmed the run.
-      setTimeout(() => clearPendingScriptId(script.id), SCRIPT_PENDING_GRACE_MS);
+      if (!script.allowMultipleInstances) {
+        setPendingScriptIds((current) => {
+          if (current.has(script.id)) return current;
+          return new Set(current).add(script.id);
+        });
+        // Fires harmlessly when the poll already confirmed the run.
+        setTimeout(() => clearPendingScriptId(script.id), SCRIPT_PENDING_GRACE_MS);
+      }
 
       setTerminalUiLaunchContext({
         threadId: activeThreadId,
@@ -3966,6 +3971,7 @@ export default function ChatView(props: ChatViewProps) {
       activeThread,
       activeThreadId,
       activeThreadRef,
+      allocatableActiveTerminalIds,
       clearPendingScriptId,
       gitCwd,
       setTerminalOpen,

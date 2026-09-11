@@ -156,7 +156,10 @@ export function selectRunningProjectScriptIds(input: {
   );
   return new Set(
     input.scripts
-      .filter((script) => busy.has(projectScriptTerminalId(script.id)))
+      // Several terminals, so no single session to report on or stop.
+      .filter(
+        (script) => !script.allowMultipleInstances && busy.has(projectScriptTerminalId(script.id)),
+      )
       .map((script) => script.id),
   );
 }

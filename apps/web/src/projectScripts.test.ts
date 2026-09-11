@@ -25,6 +25,7 @@ describe("projectScripts helpers", () => {
         runOnWorktreeCreate: false,
         previewUrl: "http://localhost:5733",
         autoOpenPreview: true,
+        allowMultipleInstances: false,
       }),
     ).toEqual({
       id: "dev",
@@ -46,6 +47,7 @@ describe("projectScripts helpers", () => {
         runOnWorktreeCreate: false,
         previewUrl: null,
         autoOpenPreview: false,
+        allowMultipleInstances: false,
       }),
     ).toEqual({
       id: "test",

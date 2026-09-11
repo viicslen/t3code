@@ -597,8 +597,13 @@ function ThreadRouteContent(
         return;
       }
 
-      // Each action owns a terminal so every client can see it running and stop it.
-      const targetTerminalId = projectScriptTerminalId(script.id);
+      // Each action owns a terminal so every client can see it running and stop it,
+      // unless it opted into running several at once.
+      const targetTerminalId = script.allowMultipleInstances
+        ? nextOpenTerminalId({
+            listedTerminalIds: terminalMenuSessions.map((session) => session.terminalId),
+          })
+        : projectScriptTerminalId(script.id);
       const preferredWorktreePath = resolvePreferredThreadWorktreePath({
         threadShellWorktreePath: selectedThread.worktreePath ?? null,
         threadDetailWorktreePath: selectedThreadDetailWorktreePath,
@@ -637,7 +642,13 @@ function ThreadRouteContent(
         terminalId: targetTerminalId,
       });
     },
-    [navigation, selectedThread, selectedThreadDetailWorktreePath, selectedThreadProject],
+    [
+      navigation,
+      selectedThread,
+      selectedThreadDetailWorktreePath,
+      selectedThreadProject,
+      terminalMenuSessions,
+    ],
   );
 
   /**

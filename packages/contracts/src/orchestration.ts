@@ -407,6 +407,12 @@ export const ProjectScript = Schema.Struct({
    * the moment this script starts. Ignored without `previewUrl` or on web.
    */
   autoOpenPreview: Schema.optional(Schema.Boolean),
+  /**
+   * When true, each run opens its own terminal instead of reusing the one
+   * dedicated to this script. That leaves no single session to watch, so the
+   * script reports no running state and cannot be stopped from the menu.
+   */
+  allowMultipleInstances: Schema.optional(Schema.Boolean),
 });
 export type ProjectScript = typeof ProjectScript.Type;
 

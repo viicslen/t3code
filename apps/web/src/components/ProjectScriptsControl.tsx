@@ -140,6 +140,7 @@ export default function ProjectScriptsControl({
       keybinding: null,
       previewUrl: fileScript.previewUrl ?? null,
       autoOpenPreview: fileScript.previewUrl ? (fileScript.autoOpenPreview ?? false) : false,
+      allowMultipleInstances: fileScript.allowMultipleInstances ?? false,
     };
     const result = await onAddScript(payload);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {

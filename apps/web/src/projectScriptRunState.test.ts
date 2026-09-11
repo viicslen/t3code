@@ -33,6 +33,17 @@ describe("selectRunningProjectScriptIds", () => {
     ).toBe(0);
   });
 
+  it("never reports an action that runs several instances at once", () => {
+    const multi: ProjectScript = { ...script("dev"), allowMultipleInstances: true };
+    expect(
+      selectRunningProjectScriptIds({
+        scripts: [multi],
+        runningTerminalIds: [projectScriptTerminalId("dev")],
+        pendingScriptIds: new Set(["dev"]),
+      }).size,
+    ).toBe(0);
+  });
+
   it("treats a just-launched action as running before the poll confirms it", () => {
     expect([
       ...selectRunningProjectScriptIds({

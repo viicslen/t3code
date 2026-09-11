@@ -20,6 +20,8 @@ export function selectRunningProjectScriptIds(input: {
   const running = new Set(input.runningTerminalIds);
   const result = new Set<string>();
   for (const script of input.scripts) {
+    // Several terminals, so no single session to report on or stop.
+    if (script.allowMultipleInstances) continue;
     if (pending.has(script.id) || running.has(projectScriptTerminalId(script.id))) {
       result.add(script.id);
     }
