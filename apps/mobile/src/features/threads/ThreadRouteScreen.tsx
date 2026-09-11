@@ -20,6 +20,7 @@ import {
 import {
   projectScriptCwd,
   projectScriptRuntimeEnv,
+  projectScriptTerminalId,
   resolveProjectScripts,
 } from "@t3tools/shared/projectScripts";
 import { Alert, Platform, ScrollView, View } from "react-native";
@@ -54,7 +55,7 @@ import { GitActionProgressOverlay } from "./GitActionProgressOverlay";
 import {
   buildTerminalMenuSessions,
   nextOpenTerminalId,
-  resolveProjectScriptTerminalId,
+  selectRunningProjectScriptIds,
 } from "../terminal/terminalMenu";
 import {
   resolvePreferredThreadWorktreePath,
@@ -74,6 +75,7 @@ import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-s
 import { useSelectedThreadRequests } from "../../state/use-selected-thread-requests";
 import { useSelectedThreadWorktree } from "../../state/use-selected-thread-worktree";
 import { useThreadComposerState } from "../../state/use-thread-composer-state";
+import { terminalEnvironment } from "../../state/terminal";
 import { threadEnvironment } from "../../state/threads";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -95,6 +97,9 @@ interface ThreadInspectorSelection {
 }
 
 type NativeHeaderItems = ReadonlyArray<Record<string, unknown>>;
+
+/** Ctrl-C, delivered to the action terminal's foreground process group. */
+const TERMINAL_INTERRUPT_SEQUENCE = "\u0003";
 
 function InspectorPaneRoleActivation() {
   useAdaptiveWorkspacePaneRole("inspector");
@@ -234,6 +239,7 @@ function ThreadRouteContent(
   const gitActions = useSelectedThreadGitActions();
   const requests = useSelectedThreadRequests();
   const interruptThreadTurn = useAtomCommand(threadEnvironment.interruptTurn, "thread interrupt");
+  const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
   const navigation = useNavigation();
   const params = props.route.params;
   const environmentIdRaw = firstRouteParam(params.environmentId);
@@ -344,6 +350,21 @@ function ThreadRouteContent(
         workspaceRoot: selectedThreadProject?.workspaceRoot ?? null,
       }),
     [knownTerminalSessions, selectedThreadProject?.workspaceRoot],
+  );
+  const projectScripts = useMemo(
+    () =>
+      selectedThreadProject
+        ? resolveProjectScripts(
+            routeEnvironmentRuntime?.serverConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
+            selectedThreadProject,
+          )
+        : [],
+    [routeEnvironmentRuntime?.serverConfig?.settings, selectedThreadProject],
+  );
+  const runningProjectScriptIds = useMemo(
+    () =>
+      selectRunningProjectScriptIds({ scripts: projectScripts, sessions: terminalMenuSessions }),
+    [projectScripts, terminalMenuSessions],
   );
   const selectedThreadDetailWorktreePath = selectedThreadDetail?.worktreePath ?? null;
   const handleReconnectEnvironment = useCallback(() => {
@@ -576,12 +597,8 @@ function ThreadRouteContent(
         return;
       }
 
-      const targetTerminalId = resolveProjectScriptTerminalId({
-        existingTerminalIds: terminalMenuSessions.map((session) => session.terminalId),
-        hasRunningTerminal: terminalMenuSessions.some(
-          (session) => session.status === "running" || session.status === "starting",
-        ),
-      });
+      // Each action owns a terminal so every client can see it running and stop it.
+      const targetTerminalId = projectScriptTerminalId(script.id);
       const preferredWorktreePath = resolvePreferredThreadWorktreePath({
         threadShellWorktreePath: selectedThread.worktreePath ?? null,
         threadDetailWorktreePath: selectedThreadDetailWorktreePath,
@@ -620,13 +637,28 @@ function ThreadRouteContent(
         terminalId: targetTerminalId,
       });
     },
-    [
-      navigation,
-      selectedThread,
-      selectedThreadDetailWorktreePath,
-      selectedThreadProject,
-      terminalMenuSessions,
-    ],
+    [navigation, selectedThread, selectedThreadDetailWorktreePath, selectedThreadProject],
+  );
+
+  /**
+   * Ctrl-C rather than a signal: it reaches the foreground process group the way
+   * typing it would, leaving the action's terminal alive for a re-run. Stays on
+   * this screen -- stopping is a "get out of my way" tap, not a request to look
+   * at output.
+   */
+  const handleStopProjectScript = useCallback(
+    async (script: ProjectScript) => {
+      if (!selectedThread) return;
+      await writeTerminal({
+        environmentId: selectedThread.environmentId,
+        input: {
+          threadId: selectedThread.id,
+          terminalId: projectScriptTerminalId(script.id),
+          data: TERMINAL_INTERRUPT_SEQUENCE,
+        },
+      });
+    },
+    [selectedThread, writeTerminal],
   );
   const threadGitControlProps = {
     environmentId: environmentIdRaw ?? "",
@@ -646,17 +678,14 @@ function ThreadRouteContent(
     gitOperationLabel: gitState.gitOperationLabel,
     canOpenTerminal: Boolean(selectedThreadProject?.workspaceRoot),
     canOpenFiles: Boolean(selectedThreadProject?.workspaceRoot),
-    projectScripts: selectedThreadProject
-      ? resolveProjectScripts(
-          routeEnvironmentRuntime?.serverConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
-          selectedThreadProject,
-        )
-      : [],
+    projectScripts,
+    runningProjectScriptIds,
     terminalSessions: terminalMenuSessions,
     showDirectFileControl: layout.usesSplitView,
     onOpenTerminal: handleOpenTerminal,
     onOpenNewTerminal: handleOpenNewTerminal,
     onRunProjectScript: handleRunProjectScript,
+    onStopProjectScript: handleStopProjectScript,
     onPull: gitActions.onPullSelectedThreadBranch,
     onRunAction: gitActions.onRunSelectedThreadGitAction,
   };

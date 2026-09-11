@@ -98,12 +98,15 @@ type ThreadGitControlsProps = ThreadGitMenuProps & {
   readonly canOpenTerminal: boolean;
   readonly canOpenFiles: boolean;
   readonly projectScripts: ReadonlyArray<ProjectScript>;
+  /** Actions whose pinned terminal is busy; tapping one again stops it. */
+  readonly runningProjectScriptIds: ReadonlySet<string>;
   readonly terminalSessions: ReadonlyArray<TerminalMenuSession>;
   readonly showActionControls?: boolean;
   readonly showDirectFileControl?: boolean;
   readonly onOpenTerminal: (terminalId?: string | null) => void;
   readonly onOpenNewTerminal: () => void;
   readonly onRunProjectScript: (script: ProjectScript) => Promise<void>;
+  readonly onStopProjectScript: (script: ProjectScript) => Promise<void>;
 };
 
 function useThreadGitControlModel(props: ThreadGitMenuProps) {
@@ -259,13 +262,22 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
         label: "Terminal",
         menu: {
           items: [
-            ...props.projectScripts.map((script) => ({
-              description: script.command,
-              icon: { name: projectScriptMenuIcon(script.icon), type: "sfSymbol" as const },
-              label: projectScriptMenuLabel(script),
-              onPress: () => void props.onRunProjectScript(script),
-              type: "action" as const,
-            })),
+            ...props.projectScripts.map((script) => {
+              const running = props.runningProjectScriptIds.has(script.id);
+              return {
+                description: running ? `Running · ${script.command}` : script.command,
+                icon: {
+                  name: projectScriptMenuIcon(script.icon, running),
+                  type: "sfSymbol" as const,
+                },
+                label: projectScriptMenuLabel(script, running),
+                onPress: () =>
+                  void (running
+                    ? props.onStopProjectScript(script)
+                    : props.onRunProjectScript(script)),
+                type: "action" as const,
+              };
+            }),
             ...(props.projectScripts.length === 0
               ? [
                   {
@@ -384,7 +396,9 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
       props.onOpenNewTerminal,
       props.onOpenTerminal,
       props.onRunProjectScript,
+      props.onStopProjectScript,
       props.projectScripts,
+      props.runningProjectScriptIds,
       props.terminalSessions,
     ],
   );
@@ -431,18 +445,25 @@ export function ThreadGitControls(props: ThreadGitControlsProps) {
           separateBackground
         >
           {props.projectScripts.length > 0 ? (
-            props.projectScripts.map((script) => (
-              <NativeHeaderToolbar.MenuAction
-                key={script.id}
-                icon={projectScriptMenuIcon(script.icon)}
-                onPress={() => void props.onRunProjectScript(script)}
-                subtitle={script.command}
-              >
-                <NativeHeaderToolbar.Label>
-                  {projectScriptMenuLabel(script)}
-                </NativeHeaderToolbar.Label>
-              </NativeHeaderToolbar.MenuAction>
-            ))
+            props.projectScripts.map((script) => {
+              const running = props.runningProjectScriptIds.has(script.id);
+              return (
+                <NativeHeaderToolbar.MenuAction
+                  key={script.id}
+                  icon={projectScriptMenuIcon(script.icon, running)}
+                  onPress={() =>
+                    void (running
+                      ? props.onStopProjectScript(script)
+                      : props.onRunProjectScript(script))
+                  }
+                  subtitle={running ? `Running · ${script.command}` : script.command}
+                >
+                  <NativeHeaderToolbar.Label>
+                    {projectScriptMenuLabel(script, running)}
+                  </NativeHeaderToolbar.Label>
+                </NativeHeaderToolbar.MenuAction>
+              );
+            })
           ) : (
             <NativeHeaderToolbar.MenuAction
               icon="play"

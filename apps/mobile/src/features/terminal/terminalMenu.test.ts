@@ -12,7 +12,7 @@ import {
   buildTerminalMenuSessions,
   nextOpenTerminalId,
   previousLiveTerminalId,
-  resolveProjectScriptTerminalId,
+  selectRunningProjectScriptIds,
   type TerminalMenuSession,
 } from "./terminalMenu";
 
@@ -207,22 +207,33 @@ describe("previousLiveTerminalId", () => {
   });
 });
 
-describe("resolveProjectScriptTerminalId", () => {
-  it("reuses the default shell when no terminal is running", () => {
-    expect(
-      resolveProjectScriptTerminalId({
-        existingTerminalIds: [DEFAULT_TERMINAL_ID],
-        hasRunningTerminal: false,
-      }),
-    ).toBe(DEFAULT_TERMINAL_ID);
+describe("selectRunningProjectScriptIds", () => {
+  const scripts = [
+    { id: "dev", name: "Dev", command: "bun run dev", icon: "play", runOnWorktreeCreate: false },
+    { id: "test", name: "Test", command: "bun test", icon: "test", runOnWorktreeCreate: false },
+  ] as const;
+
+  it("marks an action running from its pinned terminal", () => {
+    const sessions = [
+      {
+        ...makeMenuSession({ terminalId: "script-dev", status: "running" }),
+        hasRunningSubprocess: true,
+      },
+      {
+        ...makeMenuSession({ terminalId: "script-test", status: "running" }),
+        hasRunningSubprocess: false,
+      },
+    ];
+    expect([...selectRunningProjectScriptIds({ scripts, sessions })]).toEqual(["dev"]);
   });
 
-  it("opens a new terminal when a shell is already running", () => {
-    expect(
-      resolveProjectScriptTerminalId({
-        existingTerminalIds: [DEFAULT_TERMINAL_ID, "term-2", "term-4"],
-        hasRunningTerminal: true,
-      }),
-    ).toBe("term-3");
+  it("ignores busy terminals that belong to no action", () => {
+    const sessions = [
+      {
+        ...makeMenuSession({ terminalId: "term-1", status: "running" }),
+        hasRunningSubprocess: true,
+      },
+    ];
+    expect(selectRunningProjectScriptIds({ scripts, sessions }).size).toBe(0);
   });
 });

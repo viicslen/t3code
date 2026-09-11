@@ -1,5 +1,6 @@
 import { type KnownTerminalSession } from "@t3tools/client-runtime/state/terminal";
-import { DEFAULT_TERMINAL_ID, type ProjectScript } from "@t3tools/contracts";
+import { type ProjectScript } from "@t3tools/contracts";
+import { projectScriptTerminalId } from "@t3tools/shared/projectScripts";
 import { nextTerminalId, resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
@@ -143,22 +144,30 @@ export function previousLiveTerminalId(input: {
   return (below[below.length - 1] ?? live[0])?.terminalId ?? null;
 }
 
-export function resolveProjectScriptTerminalId(input: {
-  readonly existingTerminalIds: ReadonlyArray<string>;
-  readonly hasRunningTerminal: boolean;
-}): string {
-  if (!input.hasRunningTerminal) {
-    return DEFAULT_TERMINAL_ID;
-  }
-
-  return nextTerminalId(input.existingTerminalIds);
+/** Actions whose pinned terminal currently has a child process. */
+export function selectRunningProjectScriptIds(input: {
+  readonly scripts: ReadonlyArray<ProjectScript>;
+  readonly sessions: ReadonlyArray<TerminalMenuSession>;
+}): ReadonlySet<string> {
+  const busy = new Set(
+    input.sessions
+      .filter((session) => session.hasRunningSubprocess)
+      .map((session) => session.terminalId),
+  );
+  return new Set(
+    input.scripts
+      .filter((script) => busy.has(projectScriptTerminalId(script.id)))
+      .map((script) => script.id),
+  );
 }
 
-export function projectScriptMenuLabel(script: ProjectScript): string {
+export function projectScriptMenuLabel(script: ProjectScript, running = false): string {
+  if (running) return `Stop ${script.name}`;
   return script.runOnWorktreeCreate ? `${script.name} (setup)` : script.name;
 }
 
-export function projectScriptMenuIcon(icon: ProjectScript["icon"]) {
+export function projectScriptMenuIcon(icon: ProjectScript["icon"], running = false) {
+  if (running) return "stop.fill";
   if (icon === "test") return "flask";
   if (icon === "lint") return "checklist";
   if (icon === "configure") return "wrench.and.screwdriver";
