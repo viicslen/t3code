@@ -6,6 +6,7 @@ import {
   projectScriptRuntimeEnv,
   scriptsStoppedOnThreadSettle,
   setupProjectScript,
+  TERMINAL_INTERRUPT_SEQUENCE,
 } from "@t3tools/shared/projectScripts";
 
 import {
@@ -168,5 +169,15 @@ describe("scriptsStoppedOnThreadSettle", () => {
         { ...base, id: "fan", stopOnThreadSettle: true, allowMultipleInstances: true },
       ]).map((script) => script.id),
     ).toEqual(["dev"]);
+  });
+});
+
+describe("TERMINAL_INTERRUPT_SEQUENCE", () => {
+  // Pinned to the byte rather than to itself: an editor or tool that strips the
+  // control character would turn every "stop this action" write into a silent
+  // no-op, and every test that compares against the constant would still pass.
+  it("is a single ETX byte", () => {
+    expect(TERMINAL_INTERRUPT_SEQUENCE).toHaveLength(1);
+    expect(TERMINAL_INTERRUPT_SEQUENCE.charCodeAt(0)).toBe(3);
   });
 });
