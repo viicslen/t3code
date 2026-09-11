@@ -1,6 +1,7 @@
 import { ProjectId } from "@t3tools/contracts";
 import {
   projectScriptRuntimeEnv,
+  projectScriptTerminalId,
   resolveProjectScripts,
   setupProjectScript,
 } from "@t3tools/shared/projectScripts";
@@ -35,7 +36,6 @@ export interface ProjectSetupScriptRunnerInput {
   readonly projectId?: string;
   readonly projectCwd?: string;
   readonly worktreePath: string;
-  readonly preferredTerminalId?: string;
 }
 
 export class ProjectSetupScriptOperationError extends Schema.TaggedError<ProjectSetupScriptOperationError>()(
@@ -148,7 +148,9 @@ export const make = Effect.gen(function* () {
       } as const;
     }
 
-    const terminalId = input.preferredTerminalId ?? `setup-${script.id}`;
+    // Same terminal a manual run of this action would use, so clients can show
+    // the auto-run as running and stop it like any other action.
+    const terminalId = projectScriptTerminalId(script.id);
     const cwd = input.worktreePath;
     const env = projectScriptRuntimeEnv({
       project: { cwd: project.workspaceRoot },

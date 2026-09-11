@@ -10526,7 +10526,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               status: "started" as const,
               scriptId: "setup",
               scriptName: "Setup",
-              terminalId: "setup-setup",
+              terminalId: "script-setup",
               cwd: "/tmp/bootstrap-worktree",
             }),
         );
@@ -10906,7 +10906,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             status: "started" as const,
             scriptId: "setup",
             scriptName: "Setup",
-            terminalId: "setup-setup",
+            terminalId: "script-setup",
             cwd: "/tmp/bootstrap-worktree",
           }),
       );

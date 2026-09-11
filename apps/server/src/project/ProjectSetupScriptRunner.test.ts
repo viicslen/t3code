@@ -83,7 +83,7 @@ describe("ProjectSetupScriptRunner", () => {
     const open = vi.fn(() =>
       Effect.succeed({
         threadId: "thread-1",
-        terminalId: "setup-default-setup",
+        terminalId: "script-default-setup",
         cwd: "/repo/worktrees/a",
         worktreePath: "/repo/worktrees/a",
         status: "running" as const,
@@ -91,7 +91,7 @@ describe("ProjectSetupScriptRunner", () => {
         history: "",
         exitCode: null,
         exitSignal: null,
-        label: "setup-default-setup",
+        label: "script-default-setup",
         updatedAt: "2026-01-01T00:00:00.000Z",
       }),
     );
@@ -106,14 +106,14 @@ describe("ProjectSetupScriptRunner", () => {
       expect(result).toMatchObject({ status: "started", scriptId: "default-setup" });
       expect(open).toHaveBeenCalledWith({
         threadId: "thread-1",
-        terminalId: "setup-default-setup",
+        terminalId: "script-default-setup",
         cwd: "/repo/worktrees/a",
         worktreePath: "/repo/worktrees/a",
         env: { T3CODE_PROJECT_ROOT: "/repo/project", T3CODE_WORKTREE_PATH: "/repo/worktrees/a" },
       });
       expect(write).toHaveBeenCalledWith({
         threadId: "thread-1",
-        terminalId: "setup-default-setup",
+        terminalId: "script-default-setup",
         data: "npm install\r",
       });
     }).pipe(
@@ -162,7 +162,7 @@ describe("ProjectSetupScriptRunner", () => {
       const open = vi.fn(() =>
         Effect.succeed({
           threadId: "thread-1",
-          terminalId: "setup-setup",
+          terminalId: "script-setup",
           cwd: "/repo/worktrees/a",
           worktreePath: "/repo/worktrees/a",
           status: "running" as const,
@@ -170,7 +170,7 @@ describe("ProjectSetupScriptRunner", () => {
           history: "",
           exitCode: null,
           exitSignal: null,
-          label: "setup-setup",
+          label: "script-setup",
           updatedAt: "2026-01-01T00:00:00.000Z",
         }),
       );
@@ -197,12 +197,12 @@ describe("ProjectSetupScriptRunner", () => {
           status: "started",
           scriptId: "setup",
           scriptName: "Setup",
-          terminalId: "setup-setup",
+          terminalId: "script-setup",
           cwd: "/repo/worktrees/a",
         });
         expect(open).toHaveBeenCalledWith({
           threadId: "thread-1",
-          terminalId: "setup-setup",
+          terminalId: "script-setup",
           cwd: "/repo/worktrees/a",
           worktreePath: "/repo/worktrees/a",
           env: {
@@ -212,7 +212,7 @@ describe("ProjectSetupScriptRunner", () => {
         });
         expect(write).toHaveBeenCalledWith({
           threadId: "thread-1",
-          terminalId: "setup-setup",
+          terminalId: "script-setup",
           data: "bun install\r",
         });
       }).pipe(Effect.provide(testLayer(project, { open, write })));
