@@ -6,6 +6,7 @@ import {
   ProjectId,
   type OrchestrationEvent,
   type ProjectScript,
+  TerminalNotRunningError,
   ThreadId,
 } from "@t3tools/contracts";
 import { TERMINAL_INTERRUPT_SEQUENCE } from "@t3tools/shared/projectScripts";
@@ -80,7 +81,11 @@ function runSettlement(input: {
     } as unknown as ServerSettings.ServerSettingsService["Service"];
     const terminalManager = {
       write: (write: { terminalId: string; data: string }) => {
-        if (input.writeFails) return Effect.fail(new Error("no such terminal"));
+        if (input.writeFails) {
+          return Effect.fail(
+            new TerminalNotRunningError({ threadId, terminalId: write.terminalId }),
+          );
+        }
         writes.push({ terminalId: write.terminalId, data: write.data });
         return Effect.void;
       },
