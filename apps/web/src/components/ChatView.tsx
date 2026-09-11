@@ -68,6 +68,7 @@ import {
   projectScriptRuntimeEnv,
   projectScriptTerminalId,
   resolveProjectScripts,
+  TERMINAL_INTERRUPT_SEQUENCE,
 } from "@t3tools/shared/projectScripts";
 import { truncate } from "@t3tools/shared/String";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/shared/threadReference";
@@ -678,8 +679,6 @@ function formatOutgoingPrompt(params: {
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
 const EMPTY_SCRIPT_IDS: ReadonlySet<string> = new Set();
-/** Ctrl-C, delivered to the action terminal's foreground process group. */
-const TERMINAL_INTERRUPT_SEQUENCE = "\u0003";
 /**
  * How long a launched action may claim to be running before the server's
  * subprocess poll has to back it up. Without this, an action that exits

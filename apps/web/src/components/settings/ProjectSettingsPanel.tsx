@@ -777,6 +777,7 @@ function ProjectDetail({
         previewUrl: fileScript.previewUrl ?? null,
         autoOpenPreview: fileScript.previewUrl ? (fileScript.autoOpenPreview ?? false) : false,
         allowMultipleInstances: fileScript.allowMultipleInstances ?? false,
+        stopOnThreadSettle: fileScript.stopOnThreadSettle ?? false,
       };
       const result = await submitScript(null, payload);
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {

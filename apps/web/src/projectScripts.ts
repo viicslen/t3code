@@ -15,6 +15,7 @@ export interface ProjectScriptInput {
   readonly previewUrl: Exclude<ProjectScript["previewUrl"], undefined> | null;
   readonly autoOpenPreview: boolean;
   readonly allowMultipleInstances: boolean;
+  readonly stopOnThreadSettle: boolean;
 }
 
 export function buildProjectScript(id: string, input: ProjectScriptInput): ProjectScript {
@@ -24,7 +25,11 @@ export function buildProjectScript(id: string, input: ProjectScriptInput): Proje
     command: input.command,
     icon: input.icon,
     runOnWorktreeCreate: input.runOnWorktreeCreate,
-    ...(input.allowMultipleInstances ? { allowMultipleInstances: true } : {}),
+    ...(input.allowMultipleInstances
+      ? { allowMultipleInstances: true }
+      : input.stopOnThreadSettle
+        ? { stopOnThreadSettle: true }
+        : {}),
     ...(input.previewUrl === null
       ? {}
       : {

@@ -9,6 +9,7 @@ import { CheckpointReactor } from "../Services/CheckpointReactor.ts";
 import { ProviderCommandReactor } from "../Services/ProviderCommandReactor.ts";
 import { ProviderRuntimeIngestionService } from "../Services/ProviderRuntimeIngestion.ts";
 import { ThreadDeletionReactor } from "../Services/ThreadDeletionReactor.ts";
+import { ThreadSettledScriptsReactor } from "../Services/ThreadSettledScriptsReactor.ts";
 import * as ThreadSettlementReactor from "../ThreadSettlementReactor.ts";
 import * as PullRequestSyncReactor from "../PullRequestSyncReactor.ts";
 import * as ThreadPullRequestReactor from "../ThreadPullRequestReactor.ts";
@@ -68,6 +69,15 @@ describe("OrchestrationReactor", () => {
           }),
         ),
         Layer.provideMerge(
+          Layer.succeed(ThreadSettledScriptsReactor, {
+            start: () => {
+              started.push("thread-settled-scripts-reactor");
+              return Effect.void;
+            },
+            drainThrough: () => Effect.void,
+          }),
+        ),
+        Layer.provideMerge(
           Layer.succeed(ThreadPullRequestReactor.ThreadPullRequestReactor, {
             start: () => {
               started.push("thread-pull-request-reactor");
@@ -116,6 +126,7 @@ describe("OrchestrationReactor", () => {
       "provider-command-reactor",
       "checkpoint-reactor",
       "thread-deletion-reactor",
+      "thread-settled-scripts-reactor",
       "thread-pull-request-reactor",
       "thread-settlement-reactor",
       "pull-request-sync-reactor",

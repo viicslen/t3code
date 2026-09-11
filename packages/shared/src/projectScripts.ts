@@ -67,3 +67,18 @@ export function setupProjectScript(scripts: readonly ProjectScript[]): ProjectSc
 export function projectScriptTerminalId(scriptId: string): string {
   return `script-${scriptId}`;
 }
+
+/**
+ * Ctrl-C, written to an action's terminal to stop it. Reaches the foreground
+ * process group the way typing it would, so the terminal survives for a re-run
+ * and a process that traps SIGINT keeps running.
+ */
+export const TERMINAL_INTERRUPT_SEQUENCE = "\u0003";
+
+/** Actions the server interrupts when their thread settles. */
+export function scriptsStoppedOnThreadSettle(
+  scripts: readonly ProjectScript[],
+): readonly ProjectScript[] {
+  // Several terminals means no single session to interrupt.
+  return scripts.filter((script) => script.stopOnThreadSettle && !script.allowMultipleInstances);
+}

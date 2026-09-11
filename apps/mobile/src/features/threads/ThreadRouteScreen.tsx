@@ -22,6 +22,7 @@ import {
   projectScriptRuntimeEnv,
   projectScriptTerminalId,
   resolveProjectScripts,
+  TERMINAL_INTERRUPT_SEQUENCE,
 } from "@t3tools/shared/projectScripts";
 import { Alert, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -97,9 +98,6 @@ interface ThreadInspectorSelection {
 }
 
 type NativeHeaderItems = ReadonlyArray<Record<string, unknown>>;
-
-/** Ctrl-C, delivered to the action terminal's foreground process group. */
-const TERMINAL_INTERRUPT_SEQUENCE = "\u0003";
 
 function InspectorPaneRoleActivation() {
   useAdaptiveWorkspacePaneRole("inspector");

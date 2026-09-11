@@ -413,6 +413,12 @@ export const ProjectScript = Schema.Struct({
    * script reports no running state and cannot be stopped from the menu.
    */
   allowMultipleInstances: Schema.optional(Schema.Boolean),
+  /**
+   * When true, the server interrupts this script once its thread settles, so a
+   * dev server or watcher does not outlive the work that started it. Requires a
+   * dedicated terminal, so it is ignored alongside `allowMultipleInstances`.
+   */
+  stopOnThreadSettle: Schema.optional(Schema.Boolean),
 });
 export type ProjectScript = typeof ProjectScript.Type;
 

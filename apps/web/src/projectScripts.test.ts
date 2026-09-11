@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   projectScriptCwd,
   projectScriptRuntimeEnv,
+  scriptsStoppedOnThreadSettle,
   setupProjectScript,
 } from "@t3tools/shared/projectScripts";
 
@@ -26,6 +27,7 @@ describe("projectScripts helpers", () => {
         previewUrl: "http://localhost:5733",
         autoOpenPreview: true,
         allowMultipleInstances: false,
+        stopOnThreadSettle: false,
       }),
     ).toEqual({
       id: "dev",
@@ -48,6 +50,7 @@ describe("projectScripts helpers", () => {
         previewUrl: null,
         autoOpenPreview: false,
         allowMultipleInstances: false,
+        stopOnThreadSettle: false,
       }),
     ).toEqual({
       id: "test",
@@ -150,5 +153,20 @@ describe("projectScripts helpers", () => {
         worktreePath: null,
       }),
     ).toBe("/repo");
+  });
+});
+
+describe("scriptsStoppedOnThreadSettle", () => {
+  const base = { name: "x", command: "x", icon: "play", runOnWorktreeCreate: false } as const;
+
+  it("selects opted-in actions that own a terminal", () => {
+    expect(
+      scriptsStoppedOnThreadSettle([
+        { ...base, id: "dev", stopOnThreadSettle: true },
+        { ...base, id: "test" },
+        // No single terminal to interrupt.
+        { ...base, id: "fan", stopOnThreadSettle: true, allowMultipleInstances: true },
+      ]).map((script) => script.id),
+    ).toEqual(["dev"]);
   });
 });
